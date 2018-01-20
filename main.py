@@ -1,33 +1,91 @@
 import curses
+import levels
 import time
-from utilities import debug_print
+import misc
+from misc import debug_print
 
 
+directions = {"h": (0, -1),
+              "v": (1, -1),
+              "j": (1, 0),
+              "n": (1, 1),
+              "l": (0, 1),
+              "u": (-1, 1),
+              "k": (-1, 0),
+              "y": (-1, -1)}
+
+# Wymyslic mape 
+# Niech interfejs rysuje wszystko 
 class Game:
     def __init__(self):
-        self.current_level = Level(number=1)
-        self.player = Player()
-        # self.interface = Interface()
+        self.current_level = levels.Level(level_num=1)
+        self.player = Player(0, 0)
+        self.window = None
 
-    def main_loop(stdscr):
+    def main_loop(self, stdscr):
+        self.window = stdscr
+        curses.start_color()
+        self.current_level.draw(self.window)
+        self.player.move(*self.current_level.entrance)
+        self.window.addch(*self.current_level.entrance, "@")
+
         while True:
-            world_tick()
-            check_world_status()
+            self.world_tick()
+            self.check_world_status()
             user_input = stdscr.getkey()
+            self.interpret_input(user_input)
             stdscr.refresh()
+            self.window.move(self.player.y, self.player.x)
 
-    def draw():
-        for item in self.level
+    def player_message(self, msg):
+        for x in range(0, 24):
+            self.window.delch(0, x)
+        self.window.addstr(0, 0, msg)
+
+    def interpret_input(self, user_input):
+        if user_input in directions.keys():
+            direction = directions[user_input]
+            new_pos = (self.player.y + direction[0],
+                       self.player.x + direction[1]) 
+            tile_type = self.current_level.get_tile_type(new_pos)
+
+            if tile_type == "WALL":
+                # debug_print("Player has walken into the wall, ignorning")
+                pass
+            elif tile_type == "WALKABLE":
+                self.player_message("We're walking!")
+                self.window.addch(self.player.y, self.player.x, ".")
+                self.player.move_relative(*direction)
+                self.window.addch(*new_pos, "@")
+
+            elif tile_type == "MONSTER":
+                raise NotImplementedError("Fight hasn't been implemented yet :(")
+
+            else:
+                raise NotImplementedError("What")
+
+        else:
+            self.player_message("I don't understand what you want me to do")
+
+    def check_world_status(self):
+        pass
+
+    def world_tick(self):
+        pass
 
 
-directions = {"h": (-1, 0),
-              "v": (-1, 1),
-              "j": (0, 1),
-              "n": (1, 1),
-              "l": (1, 0),
-              "u": (1, -1),
-              "k": (0, -1),
-              "y": (-1, -1)}
+class Player(misc.GameObject):
+    def __init__(self, y, x):
+       super().__init__(y, x) 
+
+    def move_relative(self, y_diff, x_diff):
+        self.y += y_diff
+        self.x += x_diff
+
+    def move(self, y, x):
+        self.y = y
+        self.x = x
+
 
 def main(stdscr):
     # Clear screen
@@ -57,7 +115,7 @@ def place_rooms():
     rooms_sizes = [random.randint(2, 8, 2) for _ in range(rooms_n)] 
 
     rooms = []
-    for idx, size for enumerate(room_sizes):
+    for idx, size in enumerate(room_sizes):
         x, y = get_it_randomly_somehow()
         potential_room = Room(x, y, size[0], size[1])
         for existing_room in rooms:
@@ -70,5 +128,4 @@ def place_rooms():
 
 if __name__ == "__main__":
     game = Game()
-    curses.start_color()
     curses.wrapper(game.main_loop)
