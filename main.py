@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 import curses
+import interface
 import levels
 import time
 import misc
-from misc import debug_print
+from misc import debug
 
 
 directions = {"h": (0, -1),
@@ -16,31 +18,40 @@ directions = {"h": (0, -1),
 
 # Wymyslic mape 
 # Niech interfejs rysuje wszystko 
+
 class Game:
     def __init__(self):
-        self.current_level = levels.Level(level_num=1)
         self.player = Player(0, 0)
-        self.window = None
+        self.interface = None
 
-    def main_loop(self, stdscr):
-        self.window = stdscr
-        curses.start_color()
-        self.current_level.draw(self.window)
+    def prepare_game(self, stdscr):
+        self.current_level = levels.Level(level_num=1, player=self.player)
+        self.interface = interface.Interface(stdscr)
         self.player.move(*self.current_level.entrance)
-        self.window.addch(*self.current_level.entrance, "@")
+        self.current_level.draw(self.interface)
+    
+    def main_loop(self, stdscr):
+        self.prepare_game(stdscr)
 
         while True:
             self.world_tick()
             self.check_world_status()
-            user_input = stdscr.getkey()
-            self.interpret_input(user_input)
-            stdscr.refresh()
-            self.window.move(self.player.y, self.player.x)
+            self.handle_player_action()
+            self.draw()
 
-    def player_message(self, msg):
-        for x in range(0, 24):
-            self.window.delch(0, x)
-        self.window.addstr(0, 0, msg)
+    @property
+    def status(self):
+        level_num = self.current_level.level_num
+        return "HP: 10/10\tMP: 10/10\tLevel: {}".format(level_num)
+
+    def draw(self):
+        self.current_level.draw(self.interface)
+        self.interface.set_player_status(self.status)
+        self.interface.refresh_and_center(self.player.y, self.player.x)
+
+    def handle_player_action(self):
+        user_input = self.interface.get_user_input()
+        self.interpret_input(user_input)
 
     def interpret_input(self, user_input):
         if user_input in directions.keys():
@@ -53,10 +64,8 @@ class Game:
                 # debug_print("Player has walken into the wall, ignorning")
                 pass
             elif tile_type == "WALKABLE":
-                self.player_message("We're walking!")
-                self.window.addch(self.player.y, self.player.x, ".")
+                self.interface.msg("We're walking!")
                 self.player.move_relative(*direction)
-                self.window.addch(*new_pos, "@")
 
             elif tile_type == "MONSTER":
                 raise NotImplementedError("Fight hasn't been implemented yet :(")
@@ -65,18 +74,28 @@ class Game:
                 raise NotImplementedError("What")
 
         else:
-            self.player_message("I don't understand what you want me to do")
+            self.interface.msg("I don't understand what you want me to do")
 
     def check_world_status(self):
         pass
 
     def world_tick(self):
+        self.current_level.tick()
         pass
 
 
-class Player(misc.GameObject):
-    def __init__(self, y, x):
-       super().__init__(y, x) 
+class Entity(misc.GameObject):
+    def __init__(self, y, x, char):
+        super().__init__(y, x) 
+        self.char = char
+
+    def draw(self, window):
+        window.addch(self.y, self.x, self.char)
+
+
+class Player(Entity):
+    def __init__(self, y, x,):
+       super().__init__(y, x, "@") 
 
     def move_relative(self, y_diff, x_diff):
         self.y += y_diff
@@ -104,26 +123,6 @@ def main(stdscr):
 
         key = stdscr.getkey()
         stdscr.addstr(i, 0, '10 divided by {} is {}'.format(key, ord(key)))
-
-def generate_level():
-    place_rooms()
-    make_corridors()
-    place_enemies()
-
-def place_rooms():
-    rooms_n = random.randint(2, 6)
-    rooms_sizes = [random.randint(2, 8, 2) for _ in range(rooms_n)] 
-
-    rooms = []
-    for idx, size in enumerate(room_sizes):
-        x, y = get_it_randomly_somehow()
-        potential_room = Room(x, y, size[0], size[1])
-        for existing_room in rooms:
-            if self.room_colision(potential_room, existing_room):
-                debug_print("Kolizja")
-        Room(x, y, w, h)
-        
-    make_corridors()
 
 
 if __name__ == "__main__":
