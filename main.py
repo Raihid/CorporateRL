@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 import curses
+
+import entities
 import interface
 import levels
-import time
 import misc
 from misc import debug
 
@@ -18,10 +19,9 @@ directions = {"h": (0, -1),
 
 # Wymyslic mape 
 # Niech interfejs rysuje wszystko 
-
 class Game:
     def __init__(self):
-        self.player = Player(0, 0)
+        self.player = entities.Player(0, 0)
         self.interface = None
 
     def prepare_game(self, stdscr):
@@ -81,49 +81,24 @@ class Game:
 
     def world_tick(self):
         self.current_level.tick()
-        pass
-
-
-class Entity(misc.GameObject):
-    def __init__(self, y, x, char):
-        super().__init__(y, x) 
-        self.char = char
-
-    def draw(self, window):
-        window.addch(self.y, self.x, self.char)
-
-
-class Player(Entity):
-    def __init__(self, y, x,):
-       super().__init__(y, x, "@") 
-
-    def move_relative(self, y_diff, x_diff):
-        self.y += y_diff
-        self.x += x_diff
-
-    def move(self, y, x):
-        self.y = y
-        self.x = x
-
-
-def main(stdscr):
-    # Clear screen
-    stdscr.clear()
-    win = curses.newwin(24, 80, 0, 0)
-    for y in range(0, 23):
-        key = stdscr.getkey()
-        for x in range(0, 79):
-            win.addch(y, x, ord('a') + (x*x+y*y) % 26)
-
-        win.refresh()
-
-
-    for i in range(0, 10):
-        v = i-10
-
-        key = stdscr.getkey()
-        stdscr.addstr(i, 0, '10 divided by {} is {}'.format(key, ord(key)))
-
+        for creature in self.current_level.creatures:
+            debug("Creature;", creature.y, creature.x)
+            if isinstance(creature, entities.Player):
+                continue
+            room = self.current_level.grid[creature.y][creature.x]
+            visible_entities = [entity for entity
+                                in self.current_level.creatures  
+                                if entity in room]
+            debug(self.current_level.creatures)
+            new_y, new_x = creature.decide_move(visible_entities)
+            if not self.current_level.in_bounds(new_y, new_x):
+                continue
+            try:
+                if self.current_level.grid[new_y][new_x].walkable:
+                    creature.y = new_y
+                    creature.x = new_x
+            except IndexError:
+                continue
 
 if __name__ == "__main__":
     game = Game()

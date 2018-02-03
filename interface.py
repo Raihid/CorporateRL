@@ -31,6 +31,7 @@ class Interface():
     
     def draw_tile(self, y, x, obj_):
         assert len(obj_.char) == 1
+        debug(y, x, obj_)
         color_pair = curses.color_pair(obj_.color)
         self.window.addstr(y + self.shift_y,
                            x + self.shift_x,

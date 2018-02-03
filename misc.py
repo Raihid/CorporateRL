@@ -14,8 +14,11 @@ class GameObject():
         self.w = width
         self.h = height
         self.color = 0
+        self.walkable = False
 
     def __contains__(self, pos):
+        if isinstance(pos, GameObject):
+            pos = (pos.y, pos.x)
         if not isinstance(pos, tuple) or len(pos) != 2:
             raise ValueError("This is not a position!")
         return (pos[0] >= self.y and pos[0] < self.y + self.h and
@@ -37,6 +40,11 @@ class GameObject():
     # def h(self):
     #     return self.height
 
+def sign(x):
+    if x == 0:
+        return 0
+    else:
+        return (1 if x > 0 else -1)
 
 def debug(*args, level=0):
     strargs = [str(arg) for arg in args]

@@ -1,14 +1,15 @@
 # import interface
-import misc
 import numpy as np
 import random
+
+import entities
+import misc
 from misc import debug
 
 
 GAME_WIDTH = 80
 GAME_HEIGHT = 22
 SCREEN_HEIGHT = 24
-
 
 
 class Wall(misc.GameObject):
@@ -36,6 +37,7 @@ class Room(misc.GameObject):
     def __init__(self, y, x, h, w):
         super().__init__(y, x, h, w)
         self.visible = False
+        self.walkable = True
 
         self.doors = []
         self.char = "."
@@ -52,7 +54,7 @@ class Level:
     def __init__(self, level_num, player, entrance=None):
         self.rooms = []
         self._entrance = entrance if entrance else (15, 15)
-        self.grid = [[list() for _ in range(GAME_WIDTH)]
+        self.grid = [[None for _ in range(GAME_WIDTH)]
                         for _ in range(GAME_HEIGHT)]
         self.visibility = [[False for _ in range(GAME_WIDTH)]
                                 for _ in range(GAME_HEIGHT)]
@@ -61,6 +63,7 @@ class Level:
         self.player = player
         self.walls = []
         self.doors = []
+        self.creatures = [self.player]
         self.generate_level()
 
     def tick(self):
@@ -69,12 +72,17 @@ class Level:
             if pos in room:
                 room.visible = True
 
+    def in_bounds(self, y, x):
+        return (0 < y < GAME_HEIGHT and 0 < x < GAME_WIDTH)
+
     def recursive_divide(self, y, x, h, w, step=0):
         if (w < 6 or h < 6 or step > 4 or (step > 3 and random.random() < step * 0.04)):
             return [[y, x, h, w]]
 
-        normalization = w * w + h * h
-        axis = np.random.choice([0, 1], p=[h * h / normalization, w * w / normalization])
+        unnormalized_probs = [h * h, w * w]
+        normalization = sum(unnormalized_probs)
+        probs = [prob / normalization for prob in unnormalized_probs]
+        axis = np.random.choice([0, 1], p=probs)
         doorless = True
 
         if axis == 0:
@@ -119,10 +127,8 @@ class Level:
     def items(self):
         return []
 
-    @property
-    def entities(self):
-        return [self.player]
-
+    def generate_random_monster(self, y, x):
+        return entities.CorporateZombie(y, x)
 
     def generate_level(self):
         room_coords = self.recursive_divide(0, 0, GAME_HEIGHT, GAME_WIDTH)
@@ -132,11 +138,18 @@ class Level:
         
         for object_ in self.architecture:
             self.add_to_grid(object_)
+
+        for room in self.rooms:  
+            while random.random() < 0.4:
+                tile_y = random.randrange(room.y, room.y + room.h)
+                tile_x = random.randrange(room.x, room.x + room.w)
+                monster = self.generate_random_monster(tile_y, tile_x)
+                self.creatures += [monster]
     
     def add_to_grid(self, object_):
         for y in range(object_.y, object_.y + object_.h):
             for x in range(object_.x, object_.x + object_.w):
-                self.grid[y][x] += [object_]
+                self.grid[y][x] = object_
             
     def set_visibility(self, object_, visible, additional_radius=0):
         left_edge = max(0, object_.x - additional_radius)
@@ -161,15 +174,16 @@ class Level:
                 if not self.visibility[y][x] or not cell:
                 # if not cell:
                     continue
-                topmost = cell[-1]
-                interface.draw_tile(y, x, topmost)
-                debug(y, x, topmost)
+                interface.draw_tile(y, x, cell)
+                debug(y, x, cell)
 
         for item in self.items:
-            interface.draw_object(entity)
+            if self.visibility[item.y][item.x]:
+                interface.draw_object(item)
 
-        for entity in self.entities:
-            interface.draw_object(entity)
+        for creature in self.creatures:
+            if self.visibility[creature.y][creature.x]:
+                interface.draw_object(creature)
 
 
     def get_tile_type(self, pos):
